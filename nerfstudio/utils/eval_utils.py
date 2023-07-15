@@ -79,10 +79,10 @@ def eval_load_checkpoint(config: TrainerConfig, pipeline: Pipeline) -> Tuple[Pat
             exit()
             
         # only one best step in the checkpoint folder
-        load_best_step = matching_files[1]  
+        load_path = matching_files[0]  
     else:
         load_best_step = config.load_step
-    load_path = config.load_dir / f"step-{load_best_step:09d}.ckpt"
+        load_path = config.load_dir / f"step-{load_best_step:09d}.ckpt"
     
     assert load_path.exists(), f"Checkpoint {load_path} does not exist"
     loaded_state = torch.load(load_path, map_location="cpu")
