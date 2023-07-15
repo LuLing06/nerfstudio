@@ -286,10 +286,24 @@ class Trainer:
                     writer.put_scalar(
                         name="GPU Memory (MB)", scalar=torch.cuda.max_memory_allocated() / (1024**2), step=step
                     )
-
+                    
+                    
                 # Do not perform evaluation if there are no validation images
+                ### add ---chose best model ---early stop
+                best_step = 0
+                best_loss = 1000000
+                
                 if self.pipeline.datamanager.eval_dataset:
                     self.eval_iteration(step)
+                    
+                    _, eval_loss_dict, eval_metrics_dict = self.pipeline.get_eval_loss_dict(step=step)
+                    eval_loss = functools.reduce(torch.add, eval_loss_dict.values())
+                    
+                    if eval_loss < best_loss:
+                        best_loss = eval_loss
+                        best_step = step
+                        self.save_best_checkpoint(best_step)                   
+                    
 
                 if step_check(step, self.config.steps_per_save):
                     self.save_checkpoint(step)
@@ -451,6 +465,39 @@ class Trainer:
             for f in self.checkpoint_dir.glob("*"):
                 if f != ckpt_path:
                     f.unlink()
+                    
+                    
+    ### revised save best checkpoint              
+    @check_main_thread
+    def save_best_checkpoint(self, best_step: int) -> None:
+        """Save the best model and optimizers
+
+        Args:
+            best_self: number of steps in training for best checkpoint
+        """
+        # possibly make the checkpoint directory
+        if not self.checkpoint_dir.exists():
+            self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        # save the best checkpoint
+        ckpt_path: Path = self.checkpoint_dir / f"best_step-{best_step:09d}.ckpt"
+        torch.save(
+            {
+                "best_step": best_self,
+                "pipeline": self.pipeline.module.state_dict()  # type: ignore
+                if hasattr(self.pipeline, "module")
+                else self.pipeline.state_dict(),
+                "optimizers": {k: v.state_dict() for (k, v) in self.optimizers.optimizers.items()},
+                "scalers": self.grad_scaler.state_dict(),
+            },
+            ckpt_path,
+        )
+        # possibly delete old checkpoints
+        if self.config.save_only_latest_checkpoint:
+            # delete everything else in the checkpoint folder
+            for f in self.checkpoint_dir.glob("*"):
+                if f != ckpt_path:
+                    f.unlink()
+
 
     @profiler.time_function
     def train_iteration(self, step: int) -> TRAIN_INTERATION_OUTPUT:

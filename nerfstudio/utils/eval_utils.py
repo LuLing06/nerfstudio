@@ -44,8 +44,23 @@ def eval_load_checkpoint(config: TrainerConfig, pipeline: Pipeline) -> Tuple[Pat
     """
     assert config.load_dir is not None
     if config.load_step is None:
-        CONSOLE.print("Loading latest checkpoint from load_dir")
-        # NOTE: this is specific to the checkpoint name format
+        # CONSOLE.print("Loading latest checkpoint from load_dir")
+    #     # NOTE: this is specific to the checkpoint name format
+    #     if not os.path.exists(config.load_dir):
+    #         CONSOLE.rule("Error", style="red")
+    #         CONSOLE.print(f"No checkpoint directory found at {config.load_dir}, ", justify="center")
+    #         CONSOLE.print(
+    #             "Please make sure the checkpoint exists, they should be generated periodically during training",
+    #             justify="center",
+    #         )
+    #         sys.exit(1)
+    #     load_step = sorted(int(x[x.find("-") + 1 : x.find(".")]) for x in os.listdir(config.load_dir))[-1]
+    # else:
+    #     load_step = config.load_step
+    # load_path = config.load_dir / f"step-{load_step:09d}.ckpt"
+    
+        CONSOLE.print("Loading the best checkpoint from load_dir")
+    # NOTE: this is specific to the checkpoint name format
         if not os.path.exists(config.load_dir):
             CONSOLE.rule("Error", style="red")
             CONSOLE.print(f"No checkpoint directory found at {config.load_dir}, ", justify="center")
@@ -54,10 +69,19 @@ def eval_load_checkpoint(config: TrainerConfig, pipeline: Pipeline) -> Tuple[Pat
                 justify="center",
             )
             sys.exit(1)
-        load_step = sorted(int(x[x.find("-") + 1 : x.find(".")]) for x in os.listdir(config.load_dir))[-1]
+        
+        # Get the list of files in the folder
+        file_list = os.listdir(config.load_dir)
+        # Find the file with the prefix "best_"
+        matching_files = [file_name for file_name in file_list if file_name.startswith("best_")]
+        if len(matching_files) !=1 :
+            CONSOLE.rule("best model error", style="red")
+        # only one best step in the checkpoint folder
+        load_best_step = matching_files[1]  
     else:
-        load_step = config.load_step
-    load_path = config.load_dir / f"step-{load_step:09d}.ckpt"
+        load_best_step = config.load_step
+    load_path = config.load_dir / f"step-{load_best_step:09d}.ckpt"
+    
     assert load_path.exists(), f"Checkpoint {load_path} does not exist"
     loaded_state = torch.load(load_path, map_location="cpu")
     pipeline.load_pipeline(loaded_state["pipeline"], loaded_state["step"])
