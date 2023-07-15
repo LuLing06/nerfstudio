@@ -302,7 +302,10 @@ class Trainer:
                     if eval_loss < best_loss:
                         best_loss = eval_loss
                         best_step = step
-                        self.save_best_checkpoint(best_step)                   
+                        self.save_best_checkpoint(best_step)                  
+                        CONSOLE.rule('Find best Model at step {}'.format(best_step), style='green')
+                    else:
+                        CONSOLE.rule('Use old best Model at step {}'.format(best_step), style='green')
                     
 
                 if step_check(step, self.config.steps_per_save):
@@ -469,20 +472,20 @@ class Trainer:
                     
     ### revised save best checkpoint              
     @check_main_thread
-    def save_best_checkpoint(self, best_step: int) -> None:
+    def save_best_checkpoint(self, best_step:int) -> None:
         """Save the best model and optimizers
 
         Args:
-            best_self: number of steps in training for best checkpoint
+            best_step: number of steps in training for best checkpoint
         """
         # possibly make the checkpoint directory
         if not self.checkpoint_dir.exists():
             self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         # save the best checkpoint
-        ckpt_path: Path = self.checkpoint_dir / f"best_step-{best_step:09d}.ckpt"
+        ckpt_path: Path = self.checkpoint_dir / f"best.ckpt"
         torch.save(
             {
-                "best_step": best_self,
+                "best_step": best_step,
                 "pipeline": self.pipeline.module.state_dict()  # type: ignore
                 if hasattr(self.pipeline, "module")
                 else self.pipeline.state_dict(),
