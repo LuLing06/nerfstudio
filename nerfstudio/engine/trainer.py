@@ -238,6 +238,11 @@ class Trainer:
         with TimeWriter(writer, EventName.TOTAL_TRAIN_TIME):
             num_iterations = self.config.max_num_iterations
             step = 0
+
+            ### add ---chose best model ---early stop
+            best_step = 0
+            best_loss = 1e9
+
             for step in range(self._start_step, self._start_step + num_iterations):
                 while self.training_state == "paused":
                     time.sleep(0.01)
@@ -290,17 +295,12 @@ class Trainer:
                     
                 # Do not perform evaluation if there are no validation images
                 ### add ---chose best model ---early stop
-                best_step = 0
-                best_psnr = -1
-                
-
                 if self.pipeline.datamanager.eval_dataset:
-                    eval_image_metrics_dict = self.eval_iteration(step)
-                    if eval_image_metrics_dict is not None:
-                        psnr = eval_image_metrics_dict["psnr"]
-
-                        if psnr > best_psnr:
-                            best_psnr = psnr
+                    eval_loss = self.eval_iteration(step)
+                    if eval_loss is not None:
+                        # import pdb; pdb.set_trace()
+                        if best_loss > eval_loss:
+                            best_loss = eval_loss
                             best_step = step
                             self.save_best_checkpoint(best_step)
 
@@ -463,10 +463,11 @@ class Trainer:
             },
             ckpt_path,
         )
+
         # possibly delete old checkpoints
         if self.config.save_only_latest_checkpoint:
             # delete everything else in the checkpoint folder
-            for f in self.checkpoint_dir.glob("*"):
+            for f in self.checkpoint_dir.glob("step-*.ckpt"):
                 if f != ckpt_path:
                     f.unlink()
                     
@@ -483,7 +484,7 @@ class Trainer:
         if not self.checkpoint_dir.exists():
             self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         # save the best checkpoint
-        ckpt_path: Path = self.checkpoint_dir / f"best.ckpt"
+        ckpt_path: Path = self.checkpoint_dir / f"best-model.ckpt"
         torch.save(
             {
                 "best_step": best_step,
@@ -495,12 +496,6 @@ class Trainer:
             },
             ckpt_path,
         )
-        # possibly delete old checkpoints
-        if self.config.save_only_latest_checkpoint:
-            # delete everything else in the checkpoint folder
-            for f in self.checkpoint_dir.glob("*"):
-                if f != ckpt_path:
-                    f.unlink()
 
 
     @profiler.time_function
@@ -553,7 +548,7 @@ class Trainer:
             step: Current training step.
         """
 
-        eval_image_metrics_dict = None
+        eval_loss = None
         # a batch of eval rays
         if step_check(step, self.config.steps_per_eval_batch):
             _, eval_loss_dict, eval_metrics_dict = self.pipeline.get_eval_loss_dict(step=step)
@@ -583,4 +578,4 @@ class Trainer:
             writer.put_dict(name="Eval Images Metrics Dict (all images)", scalar_dict=metrics_dict, step=step)
             eval_image_metrics_dict = metrics_dict
 
-        return eval_image_metrics_dict
+        return eval_loss

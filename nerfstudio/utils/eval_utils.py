@@ -73,7 +73,7 @@ def eval_load_checkpoint(config: TrainerConfig, pipeline: Pipeline) -> Tuple[Pat
         # Get the list of files in the folder
         file_list = os.listdir(config.load_dir)
         # Find the file with the prefix "best_"
-        matching_files = [file_name for file_name in file_list if file_name.startswith("best.ckpt")]
+        matching_files = [file_name for file_name in file_list if file_name.startswith("best-model.ckpt")]
         if len(matching_files) !=1 :
             CONSOLE.rule("Error: best model error", style="red")
             exit()
