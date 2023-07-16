@@ -291,21 +291,22 @@ class Trainer:
                 # Do not perform evaluation if there are no validation images
                 ### add ---chose best model ---early stop
                 best_step = 0
-                best_loss = 1000000
+                best_psnr = -1
                 
+
                 if self.pipeline.datamanager.eval_dataset:
-                    self.eval_iteration(step)
-                    
-                    _, eval_loss_dict, eval_metrics_dict = self.pipeline.get_eval_loss_dict(step=step)
-                    eval_loss = functools.reduce(torch.add, eval_loss_dict.values())
-                    
-                    if eval_loss < best_loss:
-                        best_loss = eval_loss
-                        best_step = step
-                        self.save_best_checkpoint(best_step)                  
-                        CONSOLE.rule('Find best Model at step {}'.format(best_step), style='green')
-                    else:
-                        CONSOLE.rule('Use old best Model at step {}'.format(best_step), style='green')
+                    eval_image_metrics_dict = self.eval_iteration(step)
+                    if eval_image_metrics_dict is not None:
+                        psnr = eval_image_metrics_dict["psnr"]
+
+                        if psnr > best_psnr:
+                            best_psnr = psnr
+                            best_step = step
+                            self.save_best_checkpoint(best_step)
+
+                            CONSOLE.rule('Find best Model at step {}'.format(best_step), style='green')
+                        else:
+                            CONSOLE.rule('Use old best Model at step {}'.format(best_step), style='green')
                     
 
                 if step_check(step, self.config.steps_per_save):
@@ -551,6 +552,8 @@ class Trainer:
         Args:
             step: Current training step.
         """
+
+        eval_image_metrics_dict = None
         # a batch of eval rays
         if step_check(step, self.config.steps_per_eval_batch):
             _, eval_loss_dict, eval_metrics_dict = self.pipeline.get_eval_loss_dict(step=step)
@@ -578,3 +581,6 @@ class Trainer:
         if step_check(step, self.config.steps_per_eval_all_images):
             metrics_dict = self.pipeline.get_average_eval_image_metrics(step=step)
             writer.put_dict(name="Eval Images Metrics Dict (all images)", scalar_dict=metrics_dict, step=step)
+            eval_image_metrics_dict = metrics_dict
+
+        return eval_image_metrics_dict
