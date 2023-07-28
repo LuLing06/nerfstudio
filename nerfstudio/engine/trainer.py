@@ -31,6 +31,7 @@ from rich import box, style
 from rich.panel import Panel
 from rich.table import Table
 from torch.cuda.amp.grad_scaler import GradScaler
+import json
 
 from nerfstudio.configs.experiment_config import ExperimentConfig
 from nerfstudio.data.datamanagers.base_datamanager import VanillaDataManager
@@ -240,8 +241,27 @@ class Trainer:
             step = 0
 
             ### add ---chose best model ---early stop
-            best_step = 0
-            best_loss = 1e9
+            # best_step = 0
+            # best_loss = 1e9
+            
+            
+            
+            import pdb; pdb.set_trace()
+            directory_path = self.checkpoint_dir
+            file_name = 'best_step.json'
+            file_path = os.path.join(directory_path, file_name)
+                # Function to get the values from JSON file or set default values
+            # get the best_psnr and best_step from the json file
+            if os.path.exists(file_path):
+                with open(file_path, "r") as json_file:
+                    data = json.load(json_file)
+                best_loss = data['best_loss']
+                best_step = data['best_step']
+            else:
+                best_loss = 1e9
+                best_step = 0
+      
+      
 
             for step in range(self._start_step, self._start_step + num_iterations):
                 while self.training_state == "paused":
@@ -305,10 +325,34 @@ class Trainer:
                             self.save_best_checkpoint(best_step)
 
                             CONSOLE.rule('Find best Model at step {}'.format(best_step), style='green')
+                            
+                            # import pdb; pdb.set_trace()
+                            # print('the best step is {}'.format(best_step))
+
+                            directory_path = self.checkpoint_dir
+                            file_name = 'best_step.json'
+                            file_path = os.path.join(directory_path, file_name)
+                            
+                            data_save = {
+                                'best_step': best_step,
+                                'best_loss': best_loss.item(),
+                                
+                            }
+                            
+                            data_save_string = json.dumps(data_save,indent=4)
+
+                            # Create the directory if it doesn't exist
+                            if not os.path.exists(directory_path):
+                                os.makedirs(directory_path)
+
+                            with open(file_path, 'w') as json_file:
+                                json_file.write(data_save_string)
+                            
                         else:
                             CONSOLE.rule('Use old best Model at step {}'.format(best_step), style='green')
                     
-
+                    
+                    
                 if step_check(step, self.config.steps_per_save):
                     self.save_checkpoint(step)
 
@@ -576,6 +620,6 @@ class Trainer:
         if step_check(step, self.config.steps_per_eval_all_images):
             metrics_dict = self.pipeline.get_average_eval_image_metrics(step=step)
             writer.put_dict(name="Eval Images Metrics Dict (all images)", scalar_dict=metrics_dict, step=step)
-            eval_image_metrics_dict = metrics_dict
+
 
         return eval_loss
