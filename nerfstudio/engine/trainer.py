@@ -20,6 +20,7 @@ from __future__ import annotations
 import dataclasses
 import functools
 import os
+from glob import glob
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -455,12 +456,18 @@ class Trainer:
         """Helper function to load pipeline and optimizer from prespecified checkpoint"""
         load_dir = self.config.load_dir
         load_checkpoint = self.config.load_checkpoint
+
+        # import pdb; pdb.set_trace()
         if load_dir is not None:
             load_step = self.config.load_step
             if load_step is None:
                 print("Loading latest Nerfstudio checkpoint from load_dir...")
                 # NOTE: this is specific to the checkpoint name format
-                load_step = sorted(int(x[x.find("-") + 1 : x.find(".")]) for x in os.listdir(load_dir))[-1]
+                # load_step = sorted(int(x[x.find("-") + 1 : x.find(".")]) for x in os.listdir(load_dir))[-1]
+                # load_step = sorted(int(x[x.find("-") + 1 : x.find(".")]) for x in glob(os.path.join(load_dir, 'step-*.ckpt')))[-1]
+                recent_weight = os.path.basename(sorted(glob(os.path.join(load_dir, 'step-*.ckpt')))[-1])
+                load_step = int(recent_weight[recent_weight.find("-") + 1 : recent_weight.find(".")]) 
+
             load_path: Path = load_dir / f"step-{load_step:09d}.ckpt"
             assert load_path.exists(), f"Checkpoint {load_path} does not exist"
             loaded_state = torch.load(load_path, map_location="cpu")
